@@ -20,7 +20,7 @@ else
 fi
 
 echo "==> Installing Ansible and git (if missing)..."
-$SUDO dnf -y install ansible-core git python3-libdnf5
+$SUDO dnf -y install ansible-core git
 
 echo "==> Installing required Ansible collections..."
 ansible-galaxy collection install ansible.posix community.general --upgrade
