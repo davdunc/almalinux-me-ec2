@@ -13,6 +13,10 @@
     url: "{{ dcv_bundle_url }}"
     dest: /opt/dcv-install/dcv-server.tgz
     mode: "0644"
+  register: dcv_download
+  retries: 3
+  delay: 10
+  until: dcv_download is succeeded
 
 - name: Extract DCV bundle
   ansible.builtin.unarchive:

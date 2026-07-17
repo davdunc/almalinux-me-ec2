@@ -6,6 +6,10 @@
       - "{{ rpmfusion_nonfree_url }}"
     state: present
     disable_gpg_check: true
+  register: rpmfusion_install
+  retries: 3
+  delay: 10
+  until: rpmfusion_install is succeeded
 
 # Native RPMs are installed one at a time so a single package that has
 # not yet landed in EPEL 10 / RPM Fusion el10 does not abort the whole
