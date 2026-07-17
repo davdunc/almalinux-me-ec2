@@ -1,0 +1,27 @@
+---
+# AlmaLinux M&E-alike configuration for a stock AlmaLinux OS 10 cloud image.
+# Run on the instance itself (via bootstrap.sh) or against remote inventory.
+- name: Configure AlmaLinux 10 as a Media & Entertainment workstation
+  hosts: all
+  become: true
+
+  pre_tasks:
+    - name: Verify this is an EL10-family system
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == 'RedHat'
+          - ansible_facts['distribution_major_version'] == '10'
+        fail_msg: >-
+          This playbook targets AlmaLinux OS 10. Detected
+          {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}.
+
+  roles:
+    - role: base
+      tags: [base]
+    - role: desktop
+      tags: [desktop]
+    - role: media
+      tags: [media]
+    - role: dcv
+      tags: [dcv]
+      when: install_dcv | bool

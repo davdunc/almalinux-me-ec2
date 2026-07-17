@@ -1,0 +1,25 @@
+---
+- name: Install KDE Plasma desktop environment (from EPEL) and SDDM
+  ansible.builtin.dnf:
+    name:
+      - "{{ desktop_environment_group }}"
+      - "{{ desktop_display_manager }}"
+    state: present
+  register: kde_install
+  retries: 2
+  delay: 10
+  until: kde_install is succeeded
+
+- name: Enable the display manager
+  ansible.builtin.systemd:
+    name: "{{ desktop_display_manager }}"
+    enabled: true
+
+- name: Check current default boot target
+  ansible.builtin.command: systemctl get-default
+  register: current_target
+  changed_when: false
+
+- name: Set graphical boot target
+  ansible.builtin.command: systemctl set-default graphical.target
+  when: current_target.stdout.strip() != 'graphical.target'

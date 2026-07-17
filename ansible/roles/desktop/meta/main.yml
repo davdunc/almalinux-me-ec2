@@ -1,0 +1,4 @@
+---
+# KDE Plasma comes from EPEL, which the base role enables.
+dependencies:
+  - role: base

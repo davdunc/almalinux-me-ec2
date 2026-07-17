@@ -1,0 +1,15 @@
+# Keys and credentials — never commit
+*.pem
+*.key
+.env
+.env.*
+
+# Local inventory / variable overrides
+ansible/inventory/local*
+!ansible/inventory/localhost.yml
+ansible/group_vars/local*
+*.retry
+
+# Editor/OS noise
+*.swp
+.DS_Store

@@ -1,0 +1,5 @@
+---
+# EPEL and CRB (enabled by the base role) are prerequisites for the
+# creative package set and RPM Fusion dependencies.
+dependencies:
+  - role: base

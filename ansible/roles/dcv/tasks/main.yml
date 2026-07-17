@@ -1,0 +1,52 @@
+---
+# Amazon DCV — high-performance remote display, free to use on EC2.
+# The license check is satisfied automatically via the EC2 instance's
+# access to the regional DCV license S3 bucket (see README).
+- name: Create download directory
+  ansible.builtin.file:
+    path: /opt/dcv-install
+    state: directory
+    mode: "0755"
+
+- name: Download Amazon DCV server bundle
+  ansible.builtin.get_url:
+    url: "{{ dcv_bundle_url }}"
+    dest: /opt/dcv-install/dcv-server.tgz
+    mode: "0644"
+
+- name: Extract DCV bundle
+  ansible.builtin.unarchive:
+    src: /opt/dcv-install/dcv-server.tgz
+    dest: /opt/dcv-install
+    remote_src: true
+
+- name: Find DCV server RPMs
+  ansible.builtin.find:
+    paths: /opt/dcv-install
+    patterns: "nice-dcv-server-*.rpm,nice-dcv-web-viewer-*.rpm,nice-xdcv-*.rpm"
+    recurse: true
+  register: dcv_rpms
+
+- name: Install DCV server RPMs
+  ansible.builtin.dnf:
+    name: "{{ dcv_rpms.files | map(attribute='path') | list }}"
+    state: present
+    disable_gpg_check: true
+  when: dcv_rpms.files | length > 0
+
+- name: Enable automatic console session for the default user
+  ansible.builtin.blockinfile:
+    path: /etc/dcv/dcv.conf
+    marker: "# {mark} ANSIBLE MANAGED - auto console session"
+    block: |
+      [session-management]
+      create-session = true
+      [session-management/automatic-console-session]
+      owner = "{{ dcv_session_owner }}"
+  when: dcv_auto_console_session | bool
+
+- name: Enable and start DCV server
+  ansible.builtin.systemd:
+    name: dcvserver
+    enabled: true
+    state: started

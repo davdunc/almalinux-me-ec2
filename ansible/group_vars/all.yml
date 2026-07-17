@@ -1,0 +1,63 @@
+---
+# ── General ────────────────────────────────────────────────────────────
+base_full_update: true
+
+base_packages:
+  - git
+  - vim-enhanced
+  - tmux
+  - htop
+  - unzip
+  - tar
+  - firewalld
+
+# ── Desktop (KDE Plasma, provided by EPEL 10) ──────────────────────────
+desktop_environment_group: "@KDE Plasma Workspaces"
+desktop_display_manager: sddm
+
+# ── RPM Fusion (EL10) ───────────────────────────────────────────────────
+# Verified live 2026-07-16. Note: RPM Fusion el10 is still sparse — it
+# mainly provides ffmpeg/codecs, not desktop apps.
+rpmfusion_free_url: "https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-10.noarch.rpm"
+rpmfusion_nonfree_url: "https://mirrors.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-10.noarch.rpm"
+
+# ── Creative applications (mirrors the M&E edition tool list) ──────────
+# Two tiers, verified against live EPEL 10 / RPM Fusion el10 / AlmaLinux
+# AppStream on 2026-07-16:
+#
+#   media_dnf_packages     — native RPMs that exist for EL10 today
+#   media_flatpak_packages — apps not yet packaged for EL10; installed
+#                            from Flathub instead
+#
+# As packages land in EPEL 10 over time, move them from the flatpak list
+# to the dnf list. Both installs are failure-tolerant and reported.
+media_dnf_packages:
+  - krita       # EPEL 10
+  - kdenlive    # EPEL 10
+  - mpv         # EPEL 10
+
+media_flatpak_packages:
+  - org.gimp.GIMP
+  - org.inkscape.Inkscape
+  - org.blender.Blender
+  - org.freecad.FreeCAD
+  - org.audacityteam.Audacity
+  - org.ardour.Ardour
+  - com.obsproject.Studio
+  - fr.handbrake.ghb
+
+codec_packages:
+  - ffmpeg                        # RPM Fusion el10 (nonfree-enabled build)
+  - gstreamer1-plugins-good
+
+# ── Amazon DCV (optional remote desktop) ───────────────────────────────
+# No el10 build exists yet (verified 2026-07-16: el10 tarball 404s).
+# The el9 build generally installs on EL10 via ABI compatibility — if
+# dependency resolution fails on your instance, set install_dcv: false
+# and use X11 forwarding or wait for the el10 build.
+install_dcv: true
+dcv_bundle_url: "https://d1uj6qtbmh3dt5.cloudfront.net/2025.0/Servers/nice-dcv-2025.0-20103-el9-x86_64.tgz"
+dcv_session_owner: ec2-user
+# Auto-start a console session at boot (workshop convenience); disable
+# for multi-user or on-demand session setups.
+dcv_auto_console_session: true

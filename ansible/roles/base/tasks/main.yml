@@ -1,0 +1,21 @@
+---
+- name: Update all packages
+  ansible.builtin.dnf:
+    name: '*'
+    state: latest
+  when: base_full_update | bool
+
+- name: Install core tooling
+  ansible.builtin.dnf:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: Enable CRB repository
+  community.general.dnf_config_manager:
+    name: crb
+    state: enabled
+
+- name: Install EPEL release
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present

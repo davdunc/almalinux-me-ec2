@@ -1,0 +1,76 @@
+---
+- name: Install RPM Fusion repositories
+  ansible.builtin.dnf:
+    name:
+      - "{{ rpmfusion_free_url }}"
+      - "{{ rpmfusion_nonfree_url }}"
+    state: present
+    disable_gpg_check: true
+
+# Native RPMs are installed one at a time so a single package that has
+# not yet landed in EPEL 10 / RPM Fusion el10 does not abort the whole
+# run. Failures are collected and reported at the end of the play.
+- name: Install creative applications available as EL10 RPMs
+  ansible.builtin.dnf:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ media_dnf_packages }}"
+  register: media_install
+  failed_when: false
+
+- name: Collect RPM packages that failed to install
+  ansible.builtin.set_fact:
+    me_failed_packages: >-
+      {{ media_install.results
+         | selectattr('failed', 'defined')
+         | selectattr('failed')
+         | map(attribute='item') | list }}
+
+- name: Install multimedia codecs and ffmpeg
+  ansible.builtin.dnf:
+    name: "{{ codec_packages }}"
+    state: present
+    allowerasing: true
+
+# Most of the M&E creative suite (GIMP, Inkscape, Blender, FreeCAD,
+# Audacity, Ardour, OBS Studio, HandBrake) is not yet packaged for
+# EL10 in EPEL or RPM Fusion, so those come from Flathub.
+- name: Install flatpak
+  ansible.builtin.dnf:
+    name: flatpak
+    state: present
+
+- name: Add the Flathub remote
+  community.general.flatpak_remote:
+    name: flathub
+    flatpakrepo_url: https://dl.flathub.org/repo/flathub.flatpakrepo
+    state: present
+
+# Looped per-app (not one batched call) on purpose: a single app missing
+# from Flathub must not abort the rest of the suite.
+- name: Install creative applications from Flathub (failure-tolerant)
+  community.general.flatpak:
+    name: "{{ item }}"
+    remote: flathub
+    state: present
+  loop: "{{ media_flatpak_packages }}"
+  register: flatpak_install
+  failed_when: false
+
+- name: Collect Flatpak apps that failed to install
+  ansible.builtin.set_fact:
+    me_failed_flatpaks: >-
+      {{ flatpak_install.results
+         | selectattr('failed', 'defined')
+         | selectattr('failed')
+         | map(attribute='item') | list }}
+
+- name: Report creative packages that could not be installed
+  ansible.builtin.debug:
+    msg: >-
+      {% if me_failed_packages or me_failed_flatpaks %}
+      NOT INSTALLED — RPMs: {{ me_failed_packages | join(', ') }} |
+      Flatpaks: {{ me_failed_flatpaks | join(', ') }}
+      {% else %}
+      All requested creative packages installed successfully.
+      {% endif %}
