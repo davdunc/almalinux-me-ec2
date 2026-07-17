@@ -36,7 +36,7 @@ the instance, and prints its public address.
 ```bash
 ssh -i <your-key.pem> ec2-user@<public-dns>
 sudo dnf -y install git
-git clone <this-repo-url>
+git clone https://github.com/davdunc/almalinux-me-ec2.git
 cd almalinux-me-ec2
 ./bootstrap.sh
 ```

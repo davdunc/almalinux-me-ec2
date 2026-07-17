@@ -107,7 +107,7 @@ cat <<EOF
  Next:
    ssh -i <your-key.pem> ec2-user@${PUBLIC_DNS}
    sudo dnf -y install git
-   git clone <this-repo-url> && cd almalinux-me-ec2
+   git clone https://github.com/davdunc/almalinux-me-ec2.git && cd almalinux-me-ec2
    ./bootstrap.sh
 
  When it finishes, reboot and open https://${PUBLIC_DNS}:8443
