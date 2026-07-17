@@ -5,6 +5,11 @@
 #
 # Usage:
 #   ./scripts/launch-instance.sh -k <key-pair-name> [-r region] [-t type] [-p profile]
+#                                [-V vpc-id] [-n subnet-id]
+#
+# The VPC and subnet are auto-discovered (default VPC first, otherwise
+# the first available VPC and a public subnet in it); use -V/-n to pick
+# explicitly.
 #
 # Defaults: region us-west-2, type t3.xlarge (KDE + creative apps want
 # RAM), 60 GB gp3 root volume.
@@ -21,13 +26,18 @@ NAME_TAG="$WORKSHOP_NAME"
 # Official AlmaLinux OS Foundation AWS publishing account.
 ALMA_OWNER_ID="764336703387"
 
-while getopts "k:r:t:p:s:h" opt; do
+VPC_ID=""
+SUBNET_ID=""
+
+while getopts "k:r:t:p:s:V:n:h" opt; do
   case "$opt" in
     k) KEY_NAME="$OPTARG" ;;
     r) REGION="$OPTARG" ;;
     t) INSTANCE_TYPE="$OPTARG" ;;
     p) PROFILE="$OPTARG" ;;
     s) VOLUME_SIZE="$OPTARG" ;;
+    V) VPC_ID="$OPTARG" ;;
+    n) SUBNET_ID="$OPTARG" ;;
     h)
       grep '^#' "$0" | sed 's/^# \{0,1\}//'
       exit 0
@@ -57,14 +67,50 @@ if [[ -z "$AMI_ID" || "$AMI_ID" == "None" ]]; then
 fi
 echo "    AMI: ${AMI_ID}"
 
+if [[ -z "$VPC_ID" ]]; then
+  echo "==> Discovering VPC (default VPC preferred)..."
+  VPC_ID=$("${AWS[@]}" ec2 describe-vpcs \
+    --filters "Name=isDefault,Values=true" \
+    --query 'Vpcs[0].VpcId' --output text)
+  if [[ -z "$VPC_ID" || "$VPC_ID" == "None" ]]; then
+    VPC_ID=$("${AWS[@]}" ec2 describe-vpcs \
+      --filters "Name=state,Values=available" \
+      --query 'Vpcs[0].VpcId' --output text)
+  fi
+fi
+if [[ -z "$VPC_ID" || "$VPC_ID" == "None" ]]; then
+  echo "ERROR: no VPC found in ${REGION}; create one or pass -V <vpc-id>" >&2
+  exit 1
+fi
+echo "    VPC: ${VPC_ID}"
+
+if [[ -z "$SUBNET_ID" ]]; then
+  # Prefer a subnet that assigns public IPs automatically.
+  SUBNET_ID=$("${AWS[@]}" ec2 describe-subnets \
+    --filters "Name=vpc-id,Values=${VPC_ID}" \
+              "Name=map-public-ip-on-launch,Values=true" \
+    --query 'Subnets[0].SubnetId' --output text)
+  if [[ -z "$SUBNET_ID" || "$SUBNET_ID" == "None" ]]; then
+    SUBNET_ID=$("${AWS[@]}" ec2 describe-subnets \
+      --filters "Name=vpc-id,Values=${VPC_ID}" \
+      --query 'Subnets[0].SubnetId' --output text)
+  fi
+fi
+if [[ -z "$SUBNET_ID" || "$SUBNET_ID" == "None" ]]; then
+  echo "ERROR: no subnet found in ${VPC_ID}; pass -n <subnet-id>" >&2
+  exit 1
+fi
+echo "    Subnet: ${SUBNET_ID}"
+
 echo "==> Ensuring security group '${SG_NAME}' exists..."
 SG_ID=$("${AWS[@]}" ec2 describe-security-groups \
-  --filters "Name=group-name,Values=${SG_NAME}" \
+  --filters "Name=group-name,Values=${SG_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
   --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
 
 if [[ -z "$SG_ID" || "$SG_ID" == "None" ]]; then
   SG_ID=$("${AWS[@]}" ec2 create-security-group \
     --group-name "$SG_NAME" \
+    --vpc-id "$VPC_ID" \
     --description "AlmaLinux M&E workshop: SSH + Amazon DCV" \
     --query 'GroupId' --output text)
   # SSH and DCV (8443). Tighten the CIDRs for anything longer-lived
@@ -82,6 +128,8 @@ INSTANCE_ID=$("${AWS[@]}" ec2 run-instances \
   --instance-type "$INSTANCE_TYPE" \
   --key-name "$KEY_NAME" \
   --security-group-ids "$SG_ID" \
+  --subnet-id "$SUBNET_ID" \
+  --associate-public-ip-address \
   --block-device-mappings "[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"VolumeSize\":${VOLUME_SIZE},\"VolumeType\":\"gp3\"}}]" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${NAME_TAG}}]" \
   --query 'Instances[0].InstanceId' --output text)
@@ -90,10 +138,14 @@ echo "    Instance: ${INSTANCE_ID}"
 echo "==> Waiting for the instance to be running..."
 "${AWS[@]}" ec2 wait instance-running --instance-ids "$INSTANCE_ID"
 
-read -r PUBLIC_DNS PUBLIC_IP <<<"$("${AWS[@]}" ec2 describe-instances \
+read -r PUBLIC_IP PUBLIC_DNS <<<"$("${AWS[@]}" ec2 describe-instances \
   --instance-ids "$INSTANCE_ID" \
-  --query 'Reservations[0].Instances[0].[PublicDnsName,PublicIpAddress]' \
+  --query 'Reservations[0].Instances[0].[PublicIpAddress,PublicDnsName]' \
   --output text)"
+# Non-default VPCs may not assign a public DNS name.
+if [[ -z "${PUBLIC_DNS:-}" || "$PUBLIC_DNS" == "None" ]]; then
+  PUBLIC_DNS="$PUBLIC_IP"
+fi
 
 cat <<EOF
 
