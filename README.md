@@ -65,6 +65,64 @@ certificate warning is expected). Set a password for `ec2-user` first
 > console desktop, ready for when DCV Wayland support lands — then set
 > `dcv_session_type: console` in `ansible/group_vars/all.yml`.
 
+## Workshop demo walkthrough
+
+Timings below are from a real end-to-end run on a `t3.xlarge`
+(2026-07-16). Total cost of a full demo run is well under $1.
+
+**Before the session (10 minutes, do this in advance):**
+
+1. Have an AWS account, an EC2 key pair in your region, and AWS CLI v2
+   configured. Clone this repo.
+2. Launch the instance — **~2 minutes** to running:
+   ```bash
+   ./scripts/launch-instance.sh -k <key-pair> [-p profile] [-r region]
+   ```
+3. Start the build immediately — it needs **~20–25 minutes**, so kick
+   it off before you start talking:
+   ```bash
+   ssh -i <key.pem> ec2-user@<address>
+   sudo dnf -y install git
+   git clone https://github.com/davdunc/almalinux-me-ec2.git
+   cd almalinux-me-ec2 && ./bootstrap.sh
+   ```
+   It is safe to re-run if the network hiccups — every step is
+   idempotent.
+
+**Live demo (10–15 minutes):**
+
+4. Show the playbook output finishing: the PLAY RECAP and the
+   "creative packages" report (which apps came from EPEL 10 RPMs vs
+   Flathub — a great EL10-ecosystem talking point).
+5. Set a session password: `sudo passwd ec2-user`
+6. Open `https://<address>:8443` in a browser, accept the self-signed
+   certificate, log in as `ec2-user`. You land in the DCV virtual
+   session — right-click the desktop for the application menu.
+7. Launch something visual: Blender or Krita for instant effect;
+   Kdenlive for the video-editing crowd. Mention every app streams
+   from a $0.17/hr cloud instance.
+8. Show the customization point of the workshop: open
+   `ansible/group_vars/all.yml` and demonstrate tailoring
+   `media_dnf_packages` / `media_flatpak_packages` into a
+   studio-specific image, then re-run `./bootstrap.sh` to converge.
+
+**Talking points:**
+
+- Why the remote desktop is IceWM, not Plasma (EL10 Wayland vs DCV —
+  see the note above) and what the Amazon DCV Wayland beta changes.
+- DaVinci Resolve stays a manual install (proprietary EULA).
+- GPU instances (`-t g5.xlarge` + NVIDIA driver) as the follow-on for
+  real GPU workloads.
+
+**Teardown (30 seconds):**
+
+```bash
+aws ec2 terminate-instances --instance-ids <instance-id> [--profile ... --region ...]
+```
+
+The security group, key pair, and DCV-license IAM profile are free and
+reusable — leave them for the next run.
+
 ## What gets installed
 
 | Role | Contents |
