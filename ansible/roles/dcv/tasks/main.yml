@@ -49,6 +49,13 @@
       owner = "{{ dcv_session_owner }}"
   when: dcv_auto_console_session | bool
 
+- name: Open the DCV port in firewalld
+  ansible.posix.firewalld:
+    port: "{{ dcv_port }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+
 - name: Enable and start DCV server
   ansible.builtin.systemd:
     name: dcvserver
