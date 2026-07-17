@@ -23,7 +23,8 @@ echo "==> Installing Ansible and git (if missing)..."
 $SUDO dnf -y install ansible-core git
 
 echo "==> Installing required Ansible collections..."
-ansible-galaxy collection install ansible.posix community.general --upgrade
+# community.general 12+ requires a newer ansible-core than EL10's 2.16.
+ansible-galaxy collection install 'community.general:<12.0.0'
 
 echo "==> Running the M&E configuration playbook (this takes a while —"
 echo "    a full KDE desktop plus ~30 creative applications)..."
