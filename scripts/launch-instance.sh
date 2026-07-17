@@ -122,6 +122,35 @@ if [[ -z "$SG_ID" || "$SG_ID" == "None" ]]; then
 fi
 echo "    Security group: ${SG_ID}"
 
+# Amazon DCV is free on EC2, but the server must be able to read the
+# regional dcv-license S3 bucket or it falls back to a time-limited
+# demo license. A minimal read-only role provides that.
+IAM_PROFILE_NAME="${WORKSHOP_NAME}-dcv-license"
+IAM_PROFILE_ARGS=(--iam-instance-profile "Name=${IAM_PROFILE_NAME}")
+
+echo "==> Ensuring IAM instance profile '${IAM_PROFILE_NAME}' (DCV licensing)..."
+if ! "${AWS[@]}" iam get-instance-profile \
+    --instance-profile-name "$IAM_PROFILE_NAME" >/dev/null 2>&1; then
+  if "${AWS[@]}" iam create-role --role-name "$IAM_PROFILE_NAME" \
+      --description "Read-only access to Amazon DCV license S3 buckets" \
+      --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null \
+    && "${AWS[@]}" iam put-role-policy --role-name "$IAM_PROFILE_NAME" \
+      --policy-name DcvLicenseS3Read \
+      --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::dcv-license*/*"}]}' \
+    && "${AWS[@]}" iam create-instance-profile \
+      --instance-profile-name "$IAM_PROFILE_NAME" >/dev/null \
+    && "${AWS[@]}" iam add-role-to-instance-profile \
+      --instance-profile-name "$IAM_PROFILE_NAME" --role-name "$IAM_PROFILE_NAME"; then
+    echo "    Created (waiting for IAM propagation)..."
+    sleep 12
+  else
+    echo "    WARNING: could not create the IAM profile (missing IAM"
+    echo "    permissions?). Launching without it — DCV will run on a"
+    echo "    time-limited demo license." >&2
+    IAM_PROFILE_ARGS=()
+  fi
+fi
+
 echo "==> Launching ${INSTANCE_TYPE} with ${VOLUME_SIZE} GB root volume..."
 INSTANCE_ID=$("${AWS[@]}" ec2 run-instances \
   --image-id "$AMI_ID" \
@@ -130,6 +159,7 @@ INSTANCE_ID=$("${AWS[@]}" ec2 run-instances \
   --security-group-ids "$SG_ID" \
   --subnet-id "$SUBNET_ID" \
   --associate-public-ip-address \
+  ${IAM_PROFILE_ARGS[@]+"${IAM_PROFILE_ARGS[@]}"} \
   --block-device-mappings "[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"VolumeSize\":${VOLUME_SIZE},\"VolumeType\":\"gp3\"}}]" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${NAME_TAG}}]" \
   --query 'Instances[0].InstanceId' --output text)

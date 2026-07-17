@@ -91,9 +91,11 @@ and install it on the instance manually.
 
 ## Notes
 
-- **Amazon DCV licensing**: DCV is free to use on EC2 — the server
-  checks a regional S3 licensing endpoint. If your instance has no
-  outbound internet or a restrictive IAM/S3 setup, see the
+- **Amazon DCV licensing**: DCV is free to use on EC2, but the server
+  must be able to read the regional `dcv-license.<region>` S3 bucket —
+  otherwise it runs on a time-limited demo license. The launch script
+  creates and attaches a minimal read-only IAM instance profile
+  (`almalinux-me-workshop-dcv-license`) automatically; details in the
   [DCV licensing docs](https://docs.aws.amazon.com/dcv/latest/adminguide/setting-up-license.html).
 - **DCV on EL10**: as of July 2026 there is no el10 DCV build, so this
   repo installs the **el9** 2025.0 bundle, which generally works via
