@@ -5,11 +5,6 @@
     state: latest
   when: base_full_update | bool
 
-- name: Install core tooling
-  ansible.builtin.dnf:
-    name: "{{ base_packages }}"
-    state: present
-
 - name: Enable CRB repository
   community.general.dnf_config_manager:
     name: crb
@@ -18,4 +13,10 @@
 - name: Install EPEL release
   ansible.builtin.dnf:
     name: epel-release
+    state: present
+
+# After the repos: some core tools (htop, tmux) live in EPEL on EL10.
+- name: Install core tooling
+  ansible.builtin.dnf:
+    name: "{{ base_packages }}"
     state: present
