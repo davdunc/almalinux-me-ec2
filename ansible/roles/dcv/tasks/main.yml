@@ -1,7 +1,15 @@
 ---
-# Amazon DCV — high-performance remote display, free to use on EC2.
-# The license check is satisfied automatically via the EC2 instance's
-# access to the regional DCV license S3 bucket (see README).
+# Amazon DCV — high-performance remote display, free to use on EC2
+# (the launch script attaches an IAM profile so the server can read
+# the regional dcv-license S3 bucket).
+#
+# EL10 reality check: AlmaLinux 10 has no Xorg server and EPEL 10's
+# KDE Plasma is Wayland-only, but DCV does not support Wayland yet.
+# Console sessions therefore cannot stream the KDE desktop. Instead we
+# run a VIRTUAL session inside DCV's own bundled X server (Xdcv) with
+# a lightweight X11 shell (IceWM) — all creative apps run there.
+# Plasma remains the console desktop. Flip dcv_session_type to
+# 'console' once DCV ships Wayland support.
 - name: Create download directory
   ansible.builtin.file:
     path: /opt/dcv-install
@@ -38,7 +46,14 @@
     disable_gpg_check: true
   when: dcv_rpms.files | length > 0
 
-- name: Enable automatic console session for the default user
+- name: Open the DCV port in firewalld
+  ansible.posix.firewalld:
+    port: "{{ dcv_port }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+
+- name: Enable automatic console session (requires DCV Wayland support)
   ansible.builtin.blockinfile:
     path: /etc/dcv/dcv.conf
     marker: "# {mark} ANSIBLE MANAGED - auto console session"
@@ -47,17 +62,56 @@
       create-session = true
       [session-management/automatic-console-session]
       owner = "{{ dcv_session_owner }}"
-  when: dcv_auto_console_session | bool
+  when: dcv_session_type == 'console'
 
-- name: Open the DCV port in firewalld
-  ansible.posix.firewalld:
-    port: "{{ dcv_port }}/tcp"
-    permanent: true
-    immediate: true
-    state: enabled
+- name: Install X11 shell for virtual sessions
+  ansible.builtin.dnf:
+    name: "{{ dcv_virtual_packages }}"
+    state: present
+  when: dcv_session_type == 'virtual'
+
+- name: Deploy virtual session init script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/dcv-virtual-init
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      # DCV virtual session shell. KDE Plasma on EL10 is Wayland-only,
+      # which DCV cannot capture yet, so remote sessions get IceWM.
+      exec icewm-session
+  when: dcv_session_type == 'virtual'
+
+- name: Deploy virtual session boot unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/dcv-virtual-session.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Amazon DCV virtual session ({{ dcv_session_name }})
+      Requires=dcvserver.service
+      After=dcvserver.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/bin/sleep 5
+      ExecStart=/bin/sh -c "/usr/bin/dcv list-sessions | grep -q \"'{{ dcv_session_name }}'\" || /usr/bin/dcv create-session --type=virtual --owner {{ dcv_session_owner }} --init /usr/local/bin/dcv-virtual-init {{ dcv_session_name }}"
+
+      [Install]
+      WantedBy=multi-user.target
+  when: dcv_session_type == 'virtual'
+  register: dcv_unit
 
 - name: Enable and start DCV server
   ansible.builtin.systemd:
     name: dcvserver
     enabled: true
     state: started
+
+- name: Enable and start the virtual session unit
+  ansible.builtin.systemd:
+    name: dcv-virtual-session
+    enabled: true
+    state: started
+    daemon_reload: "{{ dcv_unit is changed }}"
+  when: dcv_session_type == 'virtual'

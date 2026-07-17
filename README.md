@@ -51,10 +51,19 @@ plus a large application suite. It is safe to re-run if interrupted.
 sudo reboot
 ```
 
-Then open `https://<public-dns>:8443` in a browser — Amazon DCV serves
-the KDE Plasma desktop directly (self-signed certificate warning is
-expected). Set a password for `ec2-user` first (`sudo passwd ec2-user`)
-so you can log in to the session.
+Then open `https://<public-dns>:8443` in a browser (self-signed
+certificate warning is expected). Set a password for `ec2-user` first
+(`sudo passwd ec2-user`) so you can log in to the session.
+
+> **Why the remote desktop is IceWM, not KDE:** AlmaLinux 10 removed
+> the Xorg server and EPEL 10's KDE Plasma is Wayland-only — but
+> Amazon DCV does not support Wayland yet (that support is what AWS
+> demos as the "DCV beta"). So remote DCV sessions run as *virtual*
+> sessions inside DCV's bundled X server with IceWM as a lightweight
+> shell — right-click the desktop for the menu; every creative app
+> (Blender, GIMP, Kdenlive, …) runs there. KDE Plasma remains the
+> console desktop, ready for when DCV Wayland support lands — then set
+> `dcv_session_type: console` in `ansible/group_vars/all.yml`.
 
 ## What gets installed
 

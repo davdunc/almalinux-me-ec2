@@ -59,6 +59,13 @@ install_dcv: true
 dcv_bundle_url: "https://d1uj6qtbmh3dt5.cloudfront.net/2025.0/Servers/nice-dcv-2025.0-20103-el9-x86_64.tgz"
 dcv_session_owner: ec2-user
 dcv_port: 8443
-# Auto-start a console session at boot (workshop convenience); disable
-# for multi-user or on-demand session setups.
-dcv_auto_console_session: true
+# 'virtual' (default): remote desktop via DCV's own X server + IceWM —
+#   required on EL10 because DCV cannot capture Wayland and EL10's KDE
+#   is Wayland-only.
+# 'console': stream the local KDE desktop — switch to this once Amazon
+#   ships DCV Wayland support.
+dcv_session_type: virtual
+dcv_session_name: workshop
+dcv_virtual_packages:
+  - icewm
+  - xterm
